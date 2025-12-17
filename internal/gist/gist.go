@@ -13,6 +13,11 @@ func IsGHAvailable() bool {
 	return err == nil
 }
 
+func IsGHAuthenticated() bool {
+	cmd := exec.Command("gh", "auth", "status")
+	return cmd.Run() == nil
+}
+
 func Create(htmlContent string) (string, error) {
 	if !IsGHAvailable() {
 		return "", fmt.Errorf("gh CLI is not installed")

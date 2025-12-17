@@ -125,17 +125,24 @@ func shareCmd(args []string) {
 	html := converter.Convert(messages, cfg)
 
 	if createGist {
+		gistOK := true
 		if !gist.IsGHAvailable() {
-			fmt.Fprintf(os.Stderr, "error: gh CLI is not installed\n")
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "warning: gh CLI is not installed, skipping gist creation\n")
+			gistOK = false
+		} else if !gist.IsGHAuthenticated() {
+			fmt.Fprintf(os.Stderr, "warning: gh CLI is not authenticated, skipping gist creation\n")
+			gistOK = false
 		}
-		previewURL, err := gist.Create(html)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error creating gist: %v\n", err)
-			os.Exit(1)
+
+		if gistOK {
+			previewURL, err := gist.Create(html)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to create gist: %v\n", err)
+			} else {
+				fmt.Println(previewURL)
+				return
+			}
 		}
-		fmt.Println(previewURL)
-		return
 	}
 
 	if err := os.WriteFile(outputPath, []byte(html), 0644); err != nil {
