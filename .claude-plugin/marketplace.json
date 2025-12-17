@@ -1,0 +1,19 @@
+{
+  "name": "priyanshujain",
+  "owner": {
+    "name": "Priyanshu Jain"
+  },
+  "metadata": {
+    "description": "Claude Code plugins by Priyanshu Jain"
+  },
+  "plugins": [
+    {
+      "name": "claude-share",
+      "source": "./",
+      "description": "Share Claude Code threads as HTML",
+      "version": "1.0.0",
+      "license": "MIT",
+      "keywords": ["share", "export", "html", "thread"]
+    }
+  ]
+}

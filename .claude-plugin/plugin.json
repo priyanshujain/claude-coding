@@ -1,0 +1,23 @@
+{
+  "name": "claude-share",
+  "description": "Share Claude Code threads as HTML",
+  "version": "1.0.0",
+  "author": {
+    "name": "Priyanshu Jain"
+  },
+  "repository": "https://github.com/priyanshujain/claude-coding",
+  "license": "MIT",
+  "keywords": ["share", "export", "html"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/capture-session.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
