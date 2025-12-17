@@ -21,25 +21,30 @@ A Claude Code plugin that exports conversation threads to shareable HTML files.
 ### Install as Claude Code Plugin (Recommended)
 
 ```bash
-# Add the marketplace from GitHub
+# 1. Install the CLI binary
+go install github.com/priyanshujain/claude-coding/cmd/claude-share@latest
+
+# 2. Add the marketplace from GitHub
 /plugin marketplace add priyanshujain/claude-coding
 
-# Install the plugin
+# 3. Install the plugin
 /plugin install claude-share@priyanshujain
 ```
 
-### Build CLI from Source
+### Build from Source
 
 ```bash
 # Clone the repository
 git clone https://github.com/priyanshujain/claude-coding.git
 cd claude-coding
 
-# Build the CLI
+# Build and install
 make build
-
-# Install to /usr/local/bin (requires sudo)
 sudo make install
+
+# Then install the plugin (inside Claude Code)
+/plugin marketplace add priyanshujain/claude-coding
+/plugin install claude-share@priyanshujain
 ```
 
 ## Usage
