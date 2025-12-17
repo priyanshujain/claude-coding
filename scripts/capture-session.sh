@@ -6,10 +6,9 @@
 INPUT=$(cat)
 
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
-ENV_FILE=$(echo "$INPUT" | jq -r '.CLAUDE_ENV_FILE // empty')
 
-if [ -n "$SESSION_ID" ] && [ -n "$ENV_FILE" ]; then
-    echo "export CLAUDE_SESSION_ID='$SESSION_ID'" >> "$ENV_FILE"
+if [ -n "$SESSION_ID" ] && [ -n "$CLAUDE_ENV_FILE" ]; then
+    echo "export CLAUDE_SESSION_ID='$SESSION_ID'" >> "$CLAUDE_ENV_FILE"
 fi
 
 exit 0

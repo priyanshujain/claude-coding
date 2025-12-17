@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -14,6 +15,8 @@ type rawMessage struct {
 	UUID      string     `json:"uuid"`
 	Timestamp string     `json:"timestamp"`
 	Message   rawContent `json:"message"`
+	IsMeta    bool       `json:"isMeta"`
+	Summary   string     `json:"summary"`
 }
 
 type rawContent struct {
@@ -32,7 +35,7 @@ type rawContentBlock struct {
 }
 
 type Message struct {
-	ID        string // Message ID for grouping streaming chunks
+	ID        string
 	Role      string
 	Timestamp time.Time
 	Blocks    []ContentBlock
@@ -41,10 +44,10 @@ type Message struct {
 type ContentBlock struct {
 	Type      string
 	Content   string
-	ToolName  string // For tool_result blocks, the name of the tool that produced it
-	ToolUseID string // For both tool_use and tool_result
-	ToolInput string // Raw JSON input for tool_use blocks
-	IsError   bool   // For tool_result blocks, whether the tool call failed/was rejected
+	ToolName  string
+	ToolUseID string
+	ToolInput string
+	IsError   bool
 }
 
 func FindSessionFile(projectPath string) (string, error) {
@@ -91,7 +94,6 @@ func FindSessionFile(projectPath string) (string, error) {
 	return latestFile, nil
 }
 
-// FindSessionFileByID finds a session file by its session ID
 func FindSessionFileByID(projectPath, sessionID string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -109,6 +111,36 @@ func FindSessionFileByID(projectPath, sessionID string) (string, error) {
 	}
 
 	return sessionFile, nil
+}
+
+var (
+	bashInputRe   = regexp.MustCompile(`<bash-input>([\s\S]*?)</bash-input>`)
+	bashStdoutRe  = regexp.MustCompile(`<bash-stdout>([\s\S]*?)</bash-stdout>`)
+	bashStderrRe  = regexp.MustCompile(`<bash-stderr>([\s\S]*?)</bash-stderr>`)
+	commandMsgRe  = regexp.MustCompile(`<command-message>([\s\S]*?)</command-message>`)
+	commandNameRe = regexp.MustCompile(`<command-name>([\s\S]*?)</command-name>`)
+)
+
+func ParseSummary(filePath string) string {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
+
+	for scanner.Scan() {
+		var raw rawMessage
+		if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
+			continue
+		}
+		if raw.Type == "summary" && raw.Summary != "" {
+			return raw.Summary
+		}
+	}
+	return ""
 }
 
 func ParseFile(filePath string) ([]Message, error) {
@@ -133,9 +165,12 @@ func ParseFile(filePath string) ([]Message, error) {
 			continue
 		}
 
+		if raw.IsMeta {
+			continue
+		}
+
 		msg := parseRawMessage(raw)
 		if len(msg.Blocks) > 0 {
-			// Merge with previous message if same ID (streaming chunks)
 			if len(messages) > 0 && msg.ID != "" && messages[len(messages)-1].ID == msg.ID {
 				messages[len(messages)-1].Blocks = append(messages[len(messages)-1].Blocks, msg.Blocks...)
 			} else {
@@ -159,10 +194,8 @@ func parseRawMessage(raw rawMessage) Message {
 
 	switch content := raw.Message.Content.(type) {
 	case string:
-		msg.Blocks = append(msg.Blocks, ContentBlock{
-			Type:    "text",
-			Content: content,
-		})
+		blocks := parseSpecialContent(content)
+		msg.Blocks = append(msg.Blocks, blocks...)
 	case []any:
 		for _, item := range content {
 			block := parseContentBlock(item)
@@ -173,6 +206,36 @@ func parseRawMessage(raw rawMessage) Message {
 	}
 
 	return msg
+}
+
+func parseSpecialContent(content string) []ContentBlock {
+	if matches := bashInputRe.FindStringSubmatch(content); len(matches) > 1 {
+		return []ContentBlock{{Type: "bash_input", Content: matches[1]}}
+	}
+
+	if bashStdoutRe.MatchString(content) || bashStderrRe.MatchString(content) {
+		var stdout, stderr string
+		if matches := bashStdoutRe.FindStringSubmatch(content); len(matches) > 1 {
+			stdout = matches[1]
+		}
+		if matches := bashStderrRe.FindStringSubmatch(content); len(matches) > 1 {
+			stderr = matches[1]
+		}
+		return []ContentBlock{{Type: "bash_output", Content: stdout, ToolInput: stderr}}
+	}
+
+	if commandMsgRe.MatchString(content) {
+		var cmdMsg, cmdName string
+		if matches := commandMsgRe.FindStringSubmatch(content); len(matches) > 1 {
+			cmdMsg = matches[1]
+		}
+		if matches := commandNameRe.FindStringSubmatch(content); len(matches) > 1 {
+			cmdName = matches[1]
+		}
+		return []ContentBlock{{Type: "command", Content: cmdMsg, ToolName: cmdName}}
+	}
+
+	return []ContentBlock{{Type: "text", Content: content}}
 }
 
 func parseContentBlock(item any) ContentBlock {

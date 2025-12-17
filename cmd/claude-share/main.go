@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/priyanshujain/claude-coding/internal/converter"
+	"github.com/priyanshujain/claude-coding/internal/gist"
 	"github.com/priyanshujain/claude-coding/internal/parser"
 )
 
@@ -19,12 +20,14 @@ func main() {
 	var title string
 	var username string
 	var sessionID string
+	var createGist bool
 
 	flag.StringVar(&projectPath, "project", "", "project path")
 	flag.StringVar(&outputPath, "output", "", "output file path")
 	flag.StringVar(&title, "title", "", "thread title")
 	flag.StringVar(&username, "username", "", "username to display")
 	flag.StringVar(&sessionID, "session", "", "specific session ID to export")
+	flag.BoolVar(&createGist, "gist", false, "create GitHub gist and return preview URL")
 	flag.Parse()
 
 	if projectPath == "" {
@@ -73,6 +76,9 @@ func main() {
 	}
 
 	if title == "" {
+		title = parser.ParseSummary(sessionFile)
+	}
+	if title == "" {
 		title = extractTitle(messages)
 	}
 
@@ -88,6 +94,20 @@ func main() {
 	}
 
 	html := converter.Convert(messages, cfg)
+
+	if createGist {
+		if !gist.IsGHAvailable() {
+			fmt.Fprintf(os.Stderr, "error: gh CLI is not installed\n")
+			os.Exit(1)
+		}
+		previewURL, err := gist.Create(html)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating gist: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(previewURL)
+		return
+	}
 
 	if err := os.WriteFile(outputPath, []byte(html), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)

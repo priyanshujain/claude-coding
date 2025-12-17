@@ -23,6 +23,7 @@ var currentProjectPath string
 func Convert(messages []parser.Message, cfg Config) string {
 	currentProjectPath = cfg.ProjectPath
 	messages = mergeToolResults(messages)
+	messages = mergeBashMessages(messages)
 
 	var messagesHTML strings.Builder
 	for _, msg := range messages {
@@ -38,8 +39,39 @@ func Convert(messages []parser.Message, cfg Config) string {
 	return result
 }
 
+func mergeBashMessages(messages []parser.Message) []parser.Message {
+	var result []parser.Message
+	for i := 0; i < len(messages); i++ {
+		msg := messages[i]
+
+		if len(msg.Blocks) == 1 && msg.Blocks[0].Type == "bash_input" {
+			cmd := msg.Blocks[0].Content
+			var stdout, stderr string
+
+			if i+1 < len(messages) && len(messages[i+1].Blocks) == 1 && messages[i+1].Blocks[0].Type == "bash_output" {
+				stdout = messages[i+1].Blocks[0].Content
+				stderr = messages[i+1].Blocks[0].ToolInput
+				i++
+			}
+
+			msg.Blocks = []parser.ContentBlock{{
+				Type:      "bash_combined",
+				Content:   cmd,
+				ToolInput: stdout,
+				ToolName:  stderr,
+			}}
+		}
+
+		if len(msg.Blocks) == 1 && msg.Blocks[0].Type == "bash_output" {
+			continue
+		}
+
+		result = append(result, msg)
+	}
+	return result
+}
+
 func mergeToolResults(messages []parser.Message) []parser.Message {
-	// First pass: build maps of tool_use IDs to tool names and inputs
 	toolNames := make(map[string]string)
 	toolInputs := make(map[string]string)
 	for _, msg := range messages {
@@ -51,8 +83,6 @@ func mergeToolResults(messages []parser.Message) []parser.Message {
 		}
 	}
 
-	// Second pass: merge tool_results into assistant messages
-	// Insert each result right after its corresponding tool_use
 	var result []parser.Message
 	for i := 0; i < len(messages); i++ {
 		msg := messages[i]
@@ -61,14 +91,12 @@ func mergeToolResults(messages []parser.Message) []parser.Message {
 			if len(result) > 0 && result[len(result)-1].Role == "assistant" {
 				lastAssistant := &result[len(result)-1]
 
-				// For each tool_result, insert it after its matching tool_use
 				for _, resultBlock := range msg.Blocks {
 					if resultBlock.ToolUseID != "" {
 						resultBlock.ToolName = toolNames[resultBlock.ToolUseID]
 						resultBlock.ToolInput = toolInputs[resultBlock.ToolUseID]
 					}
 
-					// Find the matching tool_use and insert result after it
 					inserted := false
 					var newBlocks []parser.ContentBlock
 					for _, block := range lastAssistant.Blocks {
@@ -81,7 +109,6 @@ func mergeToolResults(messages []parser.Message) []parser.Message {
 					if inserted {
 						lastAssistant.Blocks = newBlocks
 					} else {
-						// Fallback: append at end if no match found
 						lastAssistant.Blocks = append(lastAssistant.Blocks, resultBlock)
 					}
 				}
@@ -100,7 +127,6 @@ func renderMessage(msg parser.Message, cfg Config) string {
 		content.WriteString(renderBlock(block))
 	}
 
-	// Skip empty messages (e.g., when all content was filtered out)
 	if strings.TrimSpace(content.String()) == "" {
 		return ""
 	}
@@ -125,7 +151,6 @@ func renderBlock(block parser.ContentBlock) string {
 		if content == "" {
 			return ""
 		}
-		// Skip system-injected interrupt message
 		if content == "[Request interrupted by user for tool use]" {
 			return ""
 		}
@@ -142,9 +167,51 @@ func renderBlock(block parser.ContentBlock) string {
 
 	case "tool_result":
 		return renderToolResult(block)
+
+	case "bash_combined":
+		return renderBashCombined(block.Content, block.ToolInput, block.ToolName)
+
+	case "command":
+		return renderCommand(block.Content, block.ToolName)
 	}
 
 	return ""
+}
+
+func renderBashCombined(cmd, stdout, stderr string) string {
+	termIcon := `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`
+
+	var result strings.Builder
+	result.WriteString(`<div class="tool-block">`)
+	result.WriteString(`<div class="tool-pill">` + termIcon + ` Terminal</div>`)
+	result.WriteString(`<div class="bash-command"><code>` + html.EscapeString(cmd) + `</code></div>`)
+
+	if stdout != "" || stderr != "" {
+		result.WriteString(`<div class="collapsible tool-result">`)
+		result.WriteString(`<div class="collapsible-header"><span class="chevron">▶</span> Output</div>`)
+		result.WriteString(`<div class="collapsible-content"><pre>`)
+		if stdout != "" {
+			result.WriteString(html.EscapeString(stdout))
+		}
+		if stderr != "" {
+			result.WriteString(html.EscapeString(stderr))
+		}
+		result.WriteString(`</pre></div></div>`)
+	}
+
+	result.WriteString(`</div>`)
+	return result.String()
+}
+
+func renderCommand(cmdMsg, cmdName string) string {
+	cmdIcon := `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`
+	displayName := cmdName
+	if displayName == "" {
+		displayName = "Command"
+	}
+	return `<div class="tool-block command-block">
+<div class="tool-pill">` + cmdIcon + ` ` + html.EscapeString(displayName) + `</div>
+</div>`
 }
 
 func renderToolUse(content string) string {
@@ -236,7 +303,6 @@ func renderBashTool(toolName, input, icon string) string {
 	cmd, _ := data["command"].(string)
 	desc, _ := data["description"].(string)
 
-	// Show description in pill, command in code block
 	pillText := desc
 	if pillText == "" {
 		pillText = "Bash"
@@ -268,18 +334,15 @@ func renderEditTool(toolName, input, icon string) string {
 		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
 	}
 
-	// Get relative path for display
 	displayPath := getRelativePath(filePath)
 
 	var result strings.Builder
 	result.WriteString(`<div class="tool-block">`)
 	result.WriteString(`<div class="tool-pill" title="` + html.EscapeString(filePath) + `">` + icon + ` ` + html.EscapeString(displayPath) + `</div>`)
 
-	// Show diff if we have old and new strings
 	if oldString != "" || newString != "" {
 		result.WriteString(`<div class="diff-block">`)
 
-		// Show removed lines (red)
 		if oldString != "" {
 			oldLines := strings.Split(oldString, "\n")
 			for _, line := range oldLines {
@@ -287,7 +350,6 @@ func renderEditTool(toolName, input, icon string) string {
 			}
 		}
 
-		// Show added lines (green)
 		if newString != "" {
 			newLines := strings.Split(newString, "\n")
 			for _, line := range newLines {
@@ -324,27 +386,22 @@ func renderToolResult(block parser.ContentBlock) string {
 	toolName := block.ToolName
 	content := block.Content
 
-	// Handle error/rejected tool calls
 	if block.IsError {
 		return `<div class="tool-result-error">` + html.EscapeString(content) + `</div>`
 	}
 
-	// Skip Edit results - the diff in tool_use already shows the changes
 	if toolName == "Edit" {
 		return ""
 	}
 
-	// Handle Glob tool results specially - show file paths clearly
 	if toolName == "Glob" {
 		return renderGlobResult(content)
 	}
 
-	// Handle Grep tool results specially
 	if toolName == "Grep" {
 		return renderGrepResult(content)
 	}
 
-	// Handle Read tool results - strip line numbers and add syntax highlighting
 	if toolName == "Read" {
 		content = stripLineNumbers(content)
 		lang := getLanguageFromInput(block.ToolInput)
@@ -358,7 +415,6 @@ func renderToolResult(block parser.ContentBlock) string {
 </div>`
 	}
 
-	// Default: show as collapsible with tool name
 	truncated := content
 	if len(truncated) > 2000 {
 		truncated = truncated[:2000] + "\n... (truncated)"
@@ -380,7 +436,6 @@ func renderGlobResult(content string) string {
 		return `<div class="search-result"><span class="search-result-count">No files found</span></div>`
 	}
 
-	// Split content into file paths
 	paths := strings.Split(strings.TrimSpace(content), "\n")
 	var validPaths []string
 	for _, path := range paths {
@@ -394,7 +449,6 @@ func renderGlobResult(content string) string {
 		return `<div class="search-result"><span class="search-result-count">No files found</span></div>`
 	}
 
-	// Build file list
 	var result strings.Builder
 	result.WriteString(`<div class="search-result">`)
 	result.WriteString(fmt.Sprintf(`<span class="search-result-count">Found %d files</span>`, len(validPaths)))
@@ -414,13 +468,11 @@ func renderGrepResult(content string) string {
 		return `<div class="tool-result-inline">No matches found</div>`
 	}
 
-	// Split content into file paths (assuming files_with_matches mode)
 	paths := strings.Split(strings.TrimSpace(content), "\n")
 	if len(paths) == 0 {
 		return `<div class="tool-result-inline">No matches found</div>`
 	}
 
-	// Check if it looks like file paths (simple heuristic)
 	looksLikeFilePaths := true
 	for _, path := range paths {
 		if strings.Contains(path, ":") && !strings.HasPrefix(path, "/") {
@@ -430,7 +482,6 @@ func renderGrepResult(content string) string {
 	}
 
 	if looksLikeFilePaths && len(paths) <= 20 {
-		// Show as file list similar to Glob
 		var result strings.Builder
 		result.WriteString(`<div class="tool-result-files">`)
 
@@ -447,7 +498,6 @@ func renderGrepResult(content string) string {
 		return result.String()
 	}
 
-	// Otherwise show as truncated code block
 	truncated := content
 	if len(truncated) > 2000 {
 		truncated = truncated[:2000] + "\n... (truncated)"
@@ -460,7 +510,6 @@ func renderGrepResult(content string) string {
 }
 
 func stripLineNumbers(content string) string {
-	// Strip line number prefixes like "     1→\t" from Read tool output
 	lines := strings.Split(content, "\n")
 	var result []string
 	lineNumPattern := regexp.MustCompile(`^\s*\d+→\t?`)
@@ -471,7 +520,6 @@ func stripLineNumbers(content string) string {
 }
 
 func getLanguageFromInput(toolInput string) string {
-	// Extract file_path from tool input JSON and determine language
 	var data map[string]any
 	if err := json.Unmarshal([]byte(toolInput), &data); err != nil {
 		return "plaintext"
@@ -481,7 +529,6 @@ func getLanguageFromInput(toolInput string) string {
 		return "plaintext"
 	}
 
-	// Map file extensions to Prism language names
 	ext := strings.ToLower(filePath)
 	if idx := strings.LastIndex(ext, "."); idx >= 0 {
 		ext = ext[idx:]
@@ -521,12 +568,10 @@ func getLanguageFromInput(toolInput string) string {
 }
 
 func getRelativePath(fullPath string) string {
-	// Use project path to get relative path
 	if currentProjectPath != "" && strings.HasPrefix(fullPath, currentProjectPath) {
 		rel := strings.TrimPrefix(fullPath, currentProjectPath)
 		return strings.TrimPrefix(rel, "/")
 	}
-	// Fallback: return last 3 path components
 	parts := strings.Split(fullPath, "/")
 	if len(parts) > 3 {
 		return strings.Join(parts[len(parts)-3:], "/")
