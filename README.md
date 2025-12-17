@@ -1,6 +1,6 @@
-# Claude Share
+# Claude Coding
 
-A Claude Code plugin that exports conversation threads to shareable HTML files.
+A Claude Code plugin that exports conversation threads to shareable link via github gists and gistpreview.
 
 ## Features
 
@@ -18,16 +18,24 @@ A Claude Code plugin that exports conversation threads to shareable HTML files.
 
 ## Installation
 
+### Prerequisites
+- [Go](https://go.dev/dl/) 1.20+
+- Claude Code installed and set up
+- `gh` CLI installed and authenticated (for Gist creation)
+
 ### Install as Claude Code Plugin (Recommended)
 
 ```bash
 # 1. Install the CLI binary
 go install github.com/priyanshujain/claude-coding/cmd/claude-coding@latest
 
-# 2. Add the marketplace from GitHub
+# 2. Start Claude Code
+claude
+
+# 3. Add the marketplace from GitHub
 /plugin marketplace add priyanshujain/claude-coding
 
-# 3. Install the plugin
+# 4. Install the plugin
 /plugin install claude-coding@priyanshujain
 ```
 
