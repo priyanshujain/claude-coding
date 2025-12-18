@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "go run ${CLAUDE_PLUGIN_ROOT}/scripts/session_end/main.go"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "go run ${CLAUDE_PLUGIN_ROOT}/scripts/session_start/main.go"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -132,16 +132,17 @@ func ParseSummary(filePath string) string {
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 
+	var lastSummary string
 	for scanner.Scan() {
 		var raw rawMessage
 		if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
 			continue
 		}
 		if raw.Type == "summary" && raw.Summary != "" {
-			return raw.Summary
+			lastSummary = raw.Summary
 		}
 	}
-	return ""
+	return lastSummary
 }
 
 func ParseFile(filePath string) ([]Message, error) {

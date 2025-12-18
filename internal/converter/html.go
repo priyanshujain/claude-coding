@@ -12,10 +12,12 @@ import (
 )
 
 type Config struct {
-	Title        string
-	Username     string
-	UserInitials string
-	ProjectPath  string
+	Title          string
+	Username       string
+	UserInitials   string
+	ProjectPath    string
+	PrevSessionURL string
+	NextSessionURL string
 }
 
 var currentProjectPath string
@@ -30,13 +32,38 @@ func Convert(messages []parser.Message, cfg Config) string {
 		messagesHTML.WriteString(renderMessage(msg, cfg))
 	}
 
+	navHTML := buildNavHTML(cfg.PrevSessionURL, cfg.NextSessionURL)
+
 	result := template.HTMLTemplate
 	result = strings.ReplaceAll(result, "TITLE_PLACEHOLDER", html.EscapeString(cfg.Title))
 	result = strings.ReplaceAll(result, "USERNAME_PLACEHOLDER", html.EscapeString(cfg.Username))
 	result = strings.ReplaceAll(result, "INITIALS_PLACEHOLDER", html.EscapeString(cfg.UserInitials))
+	result = strings.ReplaceAll(result, "NAV_PLACEHOLDER", navHTML)
 	result = strings.ReplaceAll(result, "MESSAGES_PLACEHOLDER", messagesHTML.String())
 
 	return result
+}
+
+func buildNavHTML(prevURL, nextURL string) string {
+	if prevURL == "" && nextURL == "" {
+		return ""
+	}
+
+	var nav strings.Builder
+	nav.WriteString(`<nav class="session-nav">`)
+
+	if prevURL != "" {
+		nav.WriteString(`<a href="` + html.EscapeString(prevURL) + `">← Previous Session</a>`)
+	} else {
+		nav.WriteString(`<span></span>`)
+	}
+
+	if nextURL != "" {
+		nav.WriteString(`<a href="` + html.EscapeString(nextURL) + `" class="nav-next">Next Session →</a>`)
+	}
+
+	nav.WriteString(`</nav>`)
+	return nav.String()
 }
 
 func mergeBashMessages(messages []parser.Message) []parser.Message {

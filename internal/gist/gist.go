@@ -19,7 +19,7 @@ func IsGHAuthenticated() bool {
 }
 
 func buildDescription(gistID string) string {
-	return fmt.Sprintf("Claude Code conversation export\nPreview: https://gistpreview.github.io/?%s\n⚠️ Do not delete - shared preview link will break", gistID)
+	return fmt.Sprintf("This is a Claude Code thread exported as HTML. You can preview it at https://gistpreview.github.io/?%s. Please do not delete it if you have shared the preview link with others, as doing so may break the link.", gistID)
 }
 
 func PreviewURL(gistID string) string {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/priyanshujain/claude-coding/internal/converter"
 	"github.com/priyanshujain/claude-coding/internal/gist"
+	"github.com/priyanshujain/claude-coding/generic/metadata"
 	"github.com/priyanshujain/claude-coding/internal/parser"
 )
 
@@ -74,6 +75,14 @@ func shareCmd(args []string) {
 		os.Exit(1)
 	}
 
+	var prevSessionID, nextSessionID string
+	if sessionID != "" {
+		m, _ := metadata.LoadMetadata(projectPath)
+		sessionID, _ = m.ResolveLatestSession(sessionID)
+		prevSessionID = m.GetPrevSessionID(sessionID)
+		nextSessionID = m.GetNextSessionID(sessionID)
+	}
+
 	if outputPath == "" {
 		outputPath = fmt.Sprintf("./thread-%s.html", time.Now().Format("20060102-150405"))
 	}
@@ -115,15 +124,6 @@ func shareCmd(args []string) {
 		username = getSystemUsername()
 	}
 
-	cfg := converter.Config{
-		Title:        title,
-		Username:     username,
-		UserInitials: getInitials(username),
-		ProjectPath:  projectPath,
-	}
-
-	html := converter.Convert(messages, cfg)
-
 	if createGist {
 		gistOK := true
 		if !gist.IsGHAvailable() {
@@ -134,21 +134,41 @@ func shareCmd(args []string) {
 			gistOK = false
 		}
 
-		if gistOK {
-			metadata := gist.LoadMetadata(projectPath)
-			filename := "claude-conversation.html"
-			if sessionID != "" {
-				filename = "claude-code-" + sessionID + ".html"
+		if gistOK && sessionID != "" {
+			m, _ := metadata.LoadMetadata(projectPath)
+
+			ensureSessionGist(projectPath, m, prevSessionID)
+			ensureSessionGist(projectPath, m, nextSessionID)
+
+			m, _ = metadata.LoadMetadata(projectPath)
+
+			var prevSessionURL, nextSessionURL string
+			if prevSessionID != "" {
+				if prevGistID := m.GetGistID(prevSessionID); prevGistID != "" {
+					prevSessionURL = gist.PreviewURL(prevGistID)
+				}
+			}
+			if nextSessionID != "" {
+				if nextGistID := m.GetGistID(nextSessionID); nextGistID != "" {
+					nextSessionURL = gist.PreviewURL(nextGistID)
+				}
 			}
 
+			cfg := converter.Config{
+				Title:          title,
+				Username:       username,
+				UserInitials:   getInitials(username),
+				ProjectPath:    projectPath,
+				PrevSessionURL: prevSessionURL,
+				NextSessionURL: nextSessionURL,
+			}
+			html := converter.Convert(messages, cfg)
+
+			filename := "claude-code-" + sessionID + ".html"
 			var previewURL string
 			var gistID string
 
-			existingGistID := ""
-			if sessionID != "" {
-				existingGistID = metadata.GetGistID(sessionID)
-			}
-
+			existingGistID := m.GetGistID(sessionID)
 			if existingGistID != "" {
 				previewURL, err = gist.Update(existingGistID, filename, html)
 				if err != nil {
@@ -163,15 +183,39 @@ func shareCmd(args []string) {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "warning: failed to create/update gist: %v\n", err)
 			} else {
-				if sessionID != "" && gistID != "" {
-					metadata.SetGistID(sessionID, gistID)
-					gist.SaveMetadata(projectPath, metadata)
-				}
+				m.SetGistID(sessionID, gistID)
+				metadata.SaveMetadata(projectPath, m)
+				updateSessionChain(projectPath, m, sessionID, previewURL)
 				fmt.Println(previewURL)
 				return
 			}
 		}
 	}
+
+	var prevSessionURL, nextSessionURL string
+	if prevSessionID != "" || nextSessionID != "" {
+		m, _ := metadata.LoadMetadata(projectPath)
+		if prevSessionID != "" {
+			if prevGistID := m.GetGistID(prevSessionID); prevGistID != "" {
+				prevSessionURL = gist.PreviewURL(prevGistID)
+			}
+		}
+		if nextSessionID != "" {
+			if nextGistID := m.GetGistID(nextSessionID); nextGistID != "" {
+				nextSessionURL = gist.PreviewURL(nextGistID)
+			}
+		}
+	}
+
+	cfg := converter.Config{
+		Title:          title,
+		Username:       username,
+		UserInitials:   getInitials(username),
+		ProjectPath:    projectPath,
+		PrevSessionURL: prevSessionURL,
+		NextSessionURL: nextSessionURL,
+	}
+	html := converter.Convert(messages, cfg)
 
 	if err := os.WriteFile(outputPath, []byte(html), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
@@ -188,6 +232,9 @@ func extractTitle(messages []parser.Message) string {
 			for _, block := range msg.Blocks {
 				if block.Type == "text" && block.Content != "" {
 					title := strings.TrimSpace(block.Content)
+					if strings.HasPrefix(title, "Caveat:") || strings.HasPrefix(title, "<") {
+						continue
+					}
 					if len(title) > 80 {
 						title = title[:77] + "..."
 					}
@@ -222,4 +269,126 @@ func getInitials(name string) string {
 		return strings.ToUpper(parts[0][:1])
 	}
 	return strings.ToUpper(string(parts[0][0]) + string(parts[len(parts)-1][0]))
+}
+
+func ensureSessionGist(projectPath string, m *metadata.Metadata, sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	if m.GetGistID(sessionID) != "" {
+		return
+	}
+
+	sessionFile, err := parser.FindSessionFileByID(projectPath, sessionID)
+	if err != nil {
+		return
+	}
+
+	messages, err := parser.ParseFile(sessionFile)
+	if err != nil || len(messages) == 0 {
+		return
+	}
+
+	title := parser.ParseSummary(sessionFile)
+	if title == "" {
+		title = extractTitle(messages)
+	}
+
+	cfg := converter.Config{
+		Title:        title,
+		Username:     getSystemUsername(),
+		UserInitials: getInitials(getSystemUsername()),
+		ProjectPath:  projectPath,
+	}
+
+	html := converter.Convert(messages, cfg)
+	filename := "claude-code-" + sessionID + ".html"
+
+	gistID, _, err := gist.Create(filename, html)
+	if err != nil {
+		return
+	}
+	m.SetGistID(sessionID, gistID)
+	metadata.SaveMetadata(projectPath, m)
+}
+
+func updateSessionChain(projectPath string, m *metadata.Metadata, currentSessionID, currentGistURL string) {
+	syncSessionGist(projectPath, m, m.GetPrevSessionID(currentSessionID), currentGistURL, "next")
+	syncSessionGist(projectPath, m, m.GetNextSessionID(currentSessionID), currentGistURL, "prev")
+}
+
+func syncSessionGist(projectPath string, m *metadata.Metadata, sessionID, adjacentURL, direction string) {
+	if sessionID == "" {
+		return
+	}
+
+	sessionFile, err := parser.FindSessionFileByID(projectPath, sessionID)
+	if err != nil {
+		return
+	}
+
+	messages, err := parser.ParseFile(sessionFile)
+	if err != nil || len(messages) == 0 {
+		return
+	}
+
+	var prevURL, nextURL string
+	if direction == "next" {
+		nextURL = adjacentURL
+		if prevID := m.GetPrevSessionID(sessionID); prevID != "" {
+			if prevGistID := m.GetGistID(prevID); prevGistID != "" {
+				prevURL = gist.PreviewURL(prevGistID)
+			}
+		}
+	} else {
+		prevURL = adjacentURL
+		if nextID := m.GetNextSessionID(sessionID); nextID != "" {
+			if nextGistID := m.GetGistID(nextID); nextGistID != "" {
+				nextURL = gist.PreviewURL(nextGistID)
+			}
+		}
+	}
+
+	title := parser.ParseSummary(sessionFile)
+	if title == "" {
+		title = extractTitle(messages)
+	}
+
+	cfg := converter.Config{
+		Title:          title,
+		Username:       getSystemUsername(),
+		UserInitials:   getInitials(getSystemUsername()),
+		ProjectPath:    projectPath,
+		PrevSessionURL: prevURL,
+		NextSessionURL: nextURL,
+	}
+
+	html := converter.Convert(messages, cfg)
+	filename := "claude-code-" + sessionID + ".html"
+
+	existingGistID := m.GetGistID(sessionID)
+	var gistID string
+
+	if existingGistID != "" {
+		_, err = gist.Update(existingGistID, filename, html)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to update %s session gist: %v\n", direction, err)
+		}
+		gistID = existingGistID
+	} else {
+		gistID, _, err = gist.Create(filename, html)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to create %s session gist: %v\n", direction, err)
+			return
+		}
+		m.SetGistID(sessionID, gistID)
+		metadata.SaveMetadata(projectPath, m)
+	}
+
+	newURL := gist.PreviewURL(gistID)
+	if direction == "next" {
+		syncSessionGist(projectPath, m, m.GetPrevSessionID(sessionID), newURL, "next")
+	} else {
+		syncSessionGist(projectPath, m, m.GetNextSessionID(sessionID), newURL, "prev")
+	}
 }

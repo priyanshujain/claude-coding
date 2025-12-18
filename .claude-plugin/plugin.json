@@ -7,17 +7,5 @@
   },
   "repository": "https://github.com/priyanshujain/claude-coding",
   "license": "MIT",
-  "keywords": ["share", "export", "html"],
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/capture-session.sh"
-          }
-        ]
-      }
-    ]
-  }
+  "keywords": ["share", "export", "html"]
 }
