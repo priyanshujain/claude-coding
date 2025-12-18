@@ -114,11 +114,12 @@ func FindSessionFileByID(projectPath, sessionID string) (string, error) {
 }
 
 var (
-	bashInputRe   = regexp.MustCompile(`<bash-input>([\s\S]*?)</bash-input>`)
-	bashStdoutRe  = regexp.MustCompile(`<bash-stdout>([\s\S]*?)</bash-stdout>`)
-	bashStderrRe  = regexp.MustCompile(`<bash-stderr>([\s\S]*?)</bash-stderr>`)
-	commandMsgRe  = regexp.MustCompile(`<command-message>([\s\S]*?)</command-message>`)
-	commandNameRe = regexp.MustCompile(`<command-name>([\s\S]*?)</command-name>`)
+	bashInputRe       = regexp.MustCompile(`<bash-input>([\s\S]*?)</bash-input>`)
+	bashStdoutRe      = regexp.MustCompile(`<bash-stdout>([\s\S]*?)</bash-stdout>`)
+	bashStderrRe      = regexp.MustCompile(`<bash-stderr>([\s\S]*?)</bash-stderr>`)
+	commandMsgRe      = regexp.MustCompile(`<command-message>([\s\S]*?)</command-message>`)
+	commandNameRe     = regexp.MustCompile(`<command-name>([\s\S]*?)</command-name>`)
+	localCmdStdoutRe  = regexp.MustCompile(`<local-command-stdout>([\s\S]*?)</local-command-stdout>`)
 )
 
 func ParseSummary(filePath string) string {
@@ -233,6 +234,10 @@ func parseSpecialContent(content string) []ContentBlock {
 			cmdName = matches[1]
 		}
 		return []ContentBlock{{Type: "command", Content: cmdMsg, ToolName: cmdName}}
+	}
+
+	if matches := localCmdStdoutRe.FindStringSubmatch(content); len(matches) > 1 {
+		return []ContentBlock{{Type: "local_command_output", Content: matches[1]}}
 	}
 
 	return []ContentBlock{{Type: "text", Content: content}}

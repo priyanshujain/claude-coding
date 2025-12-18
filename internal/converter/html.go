@@ -173,6 +173,16 @@ func renderBlock(block parser.ContentBlock) string {
 
 	case "command":
 		return renderCommand(block.Content, block.ToolName)
+
+	case "local_command_output":
+		content := strings.TrimSpace(block.Content)
+		if content == "" || content == "(no content)" {
+			return ""
+		}
+		return `<div class="local-output">` + html.EscapeString(content) + `</div>`
+
+	case "bash_input", "bash_output":
+		return ""
 	}
 
 	return ""
@@ -204,13 +214,15 @@ func renderBashCombined(cmd, stdout, stderr string) string {
 }
 
 func renderCommand(cmdMsg, cmdName string) string {
-	cmdIcon := `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`
-	displayName := cmdName
-	if displayName == "" {
-		displayName = "Command"
+	if cmdName == "" {
+		return ""
 	}
+	if strings.HasPrefix(cmdName, "/") {
+		return `<div class="slash-command">` + html.EscapeString(cmdName) + `</div>`
+	}
+	cmdIcon := `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`
 	return `<div class="tool-block command-block">
-<div class="tool-pill">` + cmdIcon + ` ` + html.EscapeString(displayName) + `</div>
+<div class="tool-pill">` + cmdIcon + ` ` + html.EscapeString(cmdName) + `</div>
 </div>`
 }
 

@@ -146,6 +146,31 @@ body {
   height: 14px;
   color: #888;
 }
+.slash-command {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #e8e8e8;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: monaco, ui-monospace, 'SF Mono', monospace;
+  color: #555;
+}
+.command-block .tool-pill {
+  background: #f0f0f0;
+  border-color: #ddd;
+  font-size: 12px;
+  padding: 4px 10px;
+  color: #666;
+}
+.local-output {
+  padding: 6px 10px;
+  background: #f8f8f8;
+  border-left: 3px solid #ddd;
+  font-size: 12px;
+  color: #666;
+  margin: 4px 0;
+  font-family: monaco, ui-monospace, 'SF Mono', monospace;
+}
 .tool-info {
   margin-top: 6px;
   padding: 10px 12px;
