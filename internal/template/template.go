@@ -155,6 +155,25 @@ body {
   font-family: monaco, ui-monospace, 'SF Mono', monospace;
   color: #555;
 }
+.session-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e8e8e8;
+}
+.session-nav a {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 14px;
+}
+.session-nav a:hover {
+  text-decoration: underline;
+}
+.session-nav .nav-next {
+  margin-left: auto;
+}
 .command-block .tool-pill {
   background: #f0f0f0;
   border-color: #ddd;
@@ -332,6 +351,7 @@ strong { font-weight: 600; }
 <span>USERNAME_PLACEHOLDER</span>
 </div>
 </div>
+NAV_PLACEHOLDER
 MESSAGES_PLACEHOLDER
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>

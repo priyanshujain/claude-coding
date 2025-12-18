@@ -9,8 +9,9 @@ import (
 )
 
 type SessionGist struct {
-	GistID    string    `json:"gist_id"`
-	UpdatedAt time.Time `json:"updated_at"`
+	GistID        string    `json:"gist_id"`
+	PrevSessionID string    `json:"prev_session_id,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type Metadata struct {
@@ -75,9 +76,23 @@ func (m *Metadata) GetGistID(sessionID string) string {
 	return ""
 }
 
-func (m *Metadata) SetGistID(sessionID, gistID string) {
-	m.Sessions[sessionID] = SessionGist{
-		GistID:    gistID,
-		UpdatedAt: time.Now(),
+func (m *Metadata) GetPrevSessionID(sessionID string) string {
+	if sg, ok := m.Sessions[sessionID]; ok {
+		return sg.PrevSessionID
 	}
+	return ""
+}
+
+func (m *Metadata) SetGistID(sessionID, gistID string) {
+	existing := m.Sessions[sessionID]
+	existing.GistID = gistID
+	existing.UpdatedAt = time.Now()
+	m.Sessions[sessionID] = existing
+}
+
+func (m *Metadata) SetPrevSessionID(sessionID, prevSessionID string) {
+	existing := m.Sessions[sessionID]
+	existing.PrevSessionID = prevSessionID
+	existing.UpdatedAt = time.Now()
+	m.Sessions[sessionID] = existing
 }
