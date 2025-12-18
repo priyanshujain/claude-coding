@@ -18,32 +18,68 @@ func IsGHAuthenticated() bool {
 	return cmd.Run() == nil
 }
 
-func Create(htmlContent string) (string, error) {
+func buildDescription(gistID string) string {
+	return fmt.Sprintf("Claude Code conversation export\nPreview: https://gistpreview.github.io/?%s\n⚠️ Do not delete - shared preview link will break", gistID)
+}
+
+func PreviewURL(gistID string) string {
+	return fmt.Sprintf("https://gistpreview.github.io/?%s", gistID)
+}
+
+func Create(filename, htmlContent string) (gistID string, previewURL string, err error) {
+	if !IsGHAvailable() {
+		return "", "", fmt.Errorf("gh CLI is not installed")
+	}
+
+	tmpDir, err := os.MkdirTemp("", "claude-gist-*")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tmpFilePath := filepath.Join(tmpDir, filename)
+	if err := os.WriteFile(tmpFilePath, []byte(htmlContent), 0644); err != nil {
+		return "", "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	cmd := exec.Command("gh", "gist", "create", "--public", tmpFilePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create gist: %w", err)
+	}
+
+	gistURL := strings.TrimSpace(string(output))
+	gistID = filepath.Base(gistURL)
+	previewURL = PreviewURL(gistID)
+
+	desc := buildDescription(gistID)
+	descCmd := exec.Command("gh", "gist", "edit", gistID, "--desc", desc)
+	descCmd.Run()
+
+	return gistID, previewURL, nil
+}
+
+func Update(gistID, filename, htmlContent string) (previewURL string, err error) {
 	if !IsGHAvailable() {
 		return "", fmt.Errorf("gh CLI is not installed")
 	}
 
-	tmpFile, err := os.CreateTemp("", "claude-thread-*.html")
+	tmpDir, err := os.MkdirTemp("", "claude-gist-*")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer os.RemoveAll(tmpDir)
 
-	if _, err := tmpFile.WriteString(htmlContent); err != nil {
-		tmpFile.Close()
+	tmpFilePath := filepath.Join(tmpDir, filename)
+	if err := os.WriteFile(tmpFilePath, []byte(htmlContent), 0644); err != nil {
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}
-	tmpFile.Close()
 
-	cmd := exec.Command("gh", "gist", "create", "--public", tmpFile.Name())
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to create gist: %w", err)
+	desc := buildDescription(gistID)
+	cmd := exec.Command("gh", "gist", "edit", gistID, "--add", tmpFilePath, "--desc", desc)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to update gist: %w", err)
 	}
 
-	gistURL := strings.TrimSpace(string(output))
-	gistID := filepath.Base(gistURL)
-
-	previewURL := fmt.Sprintf("https://gistpreview.github.io/?%s", gistID)
-	return previewURL, nil
+	return PreviewURL(gistID), nil
 }

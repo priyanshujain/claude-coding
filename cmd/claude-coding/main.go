@@ -135,10 +135,38 @@ func shareCmd(args []string) {
 		}
 
 		if gistOK {
-			previewURL, err := gist.Create(html)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "warning: failed to create gist: %v\n", err)
+			metadata := gist.LoadMetadata(projectPath)
+			filename := "claude-conversation.html"
+			if sessionID != "" {
+				filename = "claude-code-" + sessionID + ".html"
+			}
+
+			var previewURL string
+			var gistID string
+
+			existingGistID := ""
+			if sessionID != "" {
+				existingGistID = metadata.GetGistID(sessionID)
+			}
+
+			if existingGistID != "" {
+				previewURL, err = gist.Update(existingGistID, filename, html)
+				if err != nil {
+					gistID, previewURL, err = gist.Create(filename, html)
+				} else {
+					gistID = existingGistID
+				}
 			} else {
+				gistID, previewURL, err = gist.Create(filename, html)
+			}
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to create/update gist: %v\n", err)
+			} else {
+				if sessionID != "" && gistID != "" {
+					metadata.SetGistID(sessionID, gistID)
+					gist.SaveMetadata(projectPath, metadata)
+				}
 				fmt.Println(previewURL)
 				return
 			}
