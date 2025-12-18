@@ -21,7 +21,6 @@ body {
   text-align: center;
   padding-bottom: 32px;
   margin-bottom: 32px;
-  border-bottom: 1px solid #eee;
 }
 .header h1 {
   font-size: 1.4rem;
@@ -161,7 +160,6 @@ body {
   align-items: center;
   padding: 12px 0;
   margin-bottom: 16px;
-  border-bottom: 1px solid #e8e8e8;
 }
 .session-nav a {
   color: #2563eb;
