@@ -323,8 +323,16 @@ func renderToolUse(content string) string {
 		return renderGlobTool(toolName, toolInput)
 	}
 
-	if strings.Contains(toolName, "Write") {
-		return renderWriteTool(toolName, toolInput, icon)
+	if toolName == "TodoWrite" {
+		return renderTodoWriteTool(toolName, toolInput, icon)
+	}
+
+	if toolName == "Task" {
+		return renderTaskTool(toolName, toolInput, icon)
+	}
+
+	if toolName == "EnterPlanMode" {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` Entering Plan Mode</div></div>`
 	}
 
 	if toolName == "ExitPlanMode" {
@@ -333,6 +341,10 @@ func renderToolUse(content string) string {
 
 	if toolName == "AskUserQuestion" {
 		return renderAskUserQuestionTool(toolName, toolInput, icon)
+	}
+
+	if toolName == "Write" {
+		return renderWriteTool(toolName, toolInput, icon)
 	}
 
 	return `<div class="tool-block">
@@ -653,6 +665,18 @@ func renderToolResult(block parser.ContentBlock) string {
 		return renderAskUserQuestionResult(content)
 	}
 
+	if toolName == "TodoWrite" {
+		return ""
+	}
+
+	if toolName == "Task" {
+		return renderTaskResult(content)
+	}
+
+	if toolName == "EnterPlanMode" {
+		return ""
+	}
+
 	truncated := content
 	if len(truncated) > 2000 {
 		truncated = truncated[:2000] + "\n... (truncated)"
@@ -747,6 +771,108 @@ func renderGrepResult(content string) string {
 </div>`
 }
 
+func renderTaskResult(content string) string {
+	if strings.TrimSpace(content) == "" {
+		return ""
+	}
+
+	truncated := content
+	if len(truncated) > 3000 {
+		truncated = truncated[:3000] + "\n... (truncated)"
+	}
+
+	return `<div class="collapsible tool-result">
+<div class="collapsible-header"><span class="chevron">▶</span> Agent Result</div>
+<div class="collapsible-content"><div class="text-block">` + formatText(truncated) + `</div></div>
+</div>`
+}
+
+func renderTodoWriteTool(toolName, input, icon string) string {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(input), &data); err != nil {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	todos, ok := data["todos"].([]any)
+	if !ok || len(todos) == 0 {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	var result strings.Builder
+	result.WriteString(`<div class="tool-block todo-block">`)
+	result.WriteString(`<div class="tool-pill">` + icon + ` Todo List</div>`)
+	result.WriteString(`<div class="todo-list">`)
+
+	for _, t := range todos {
+		tMap, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		content, _ := tMap["content"].(string)
+		status, _ := tMap["status"].(string)
+
+		statusIcon := "○"
+		statusClass := "pending"
+		switch status {
+		case "completed":
+			statusIcon = "✓"
+			statusClass = "completed"
+		case "in_progress":
+			statusIcon = "●"
+			statusClass = "in-progress"
+		}
+
+		result.WriteString(`<div class="todo-item ` + statusClass + `">`)
+		result.WriteString(`<span class="todo-status">` + statusIcon + `</span>`)
+		result.WriteString(`<span class="todo-content">` + html.EscapeString(content) + `</span>`)
+		result.WriteString(`</div>`)
+	}
+
+	result.WriteString(`</div></div>`)
+	return result.String()
+}
+
+func renderTaskTool(toolName, input, icon string) string {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(input), &data); err != nil {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	subagentType, _ := data["subagent_type"].(string)
+	description, _ := data["description"].(string)
+	prompt, _ := data["prompt"].(string)
+
+	var result strings.Builder
+	result.WriteString(`<div class="tool-block subagent-block">`)
+	result.WriteString(`<div class="subagent-header">`)
+	result.WriteString(`<span class="subagent-badge">` + icon + ` Task</span>`)
+	result.WriteString(`<span class="subagent-note">(subagent) runs independently, doesn't use main context</span>`)
+	result.WriteString(`</div>`)
+
+	pillText := subagentType
+	if pillText == "" {
+		pillText = "Task"
+	}
+	if description != "" {
+		pillText += ": " + description
+	}
+	result.WriteString(`<div class="subagent-type">` + html.EscapeString(pillText) + `</div>`)
+
+	if prompt != "" {
+		truncated := prompt
+		if len(truncated) > 500 {
+			truncated = truncated[:500] + "..."
+		}
+		result.WriteString(`<div class="collapsible">`)
+		result.WriteString(`<div class="collapsible-header"><span class="chevron">▶</span> Prompt</div>`)
+		result.WriteString(`<div class="collapsible-content"><pre>` + html.EscapeString(truncated) + `</pre></div>`)
+		result.WriteString(`</div>`)
+	}
+
+	result.WriteString(`</div>`)
+	return result.String()
+}
+
 func renderAskUserQuestionResult(content string) string {
 	if !strings.Contains(content, "User has answered") {
 		return `<div class="tool-result-inline">` + html.EscapeString(content) + `</div>`
@@ -808,30 +934,30 @@ func getLanguageFromInput(toolInput string) string {
 	}
 
 	langMap := map[string]string{
-		".go":    "go",
-		".py":    "python",
-		".js":    "javascript",
-		".ts":    "typescript",
-		".tsx":   "typescript",
-		".jsx":   "javascript",
-		".json":  "json",
-		".yaml":  "yaml",
-		".yml":   "yaml",
-		".md":    "markdown",
-		".sh":    "bash",
-		".bash":  "bash",
-		".zsh":   "bash",
-		".rs":    "rust",
-		".html":  "markup",
-		".xml":   "markup",
-		".css":   "css",
-		".sql":   "sql",
-		".rb":    "ruby",
-		".java":  "java",
-		".c":     "c",
-		".cpp":   "cpp",
-		".h":     "c",
-		".hpp":   "cpp",
+		".go":   "go",
+		".py":   "python",
+		".js":   "javascript",
+		".ts":   "typescript",
+		".tsx":  "typescript",
+		".jsx":  "javascript",
+		".json": "json",
+		".yaml": "yaml",
+		".yml":  "yaml",
+		".md":   "markdown",
+		".sh":   "bash",
+		".bash": "bash",
+		".zsh":  "bash",
+		".rs":   "rust",
+		".html": "markup",
+		".xml":  "markup",
+		".css":  "css",
+		".sql":  "sql",
+		".rb":   "ruby",
+		".java": "java",
+		".c":    "c",
+		".cpp":  "cpp",
+		".h":    "c",
+		".hpp":  "cpp",
 	}
 
 	if lang, ok := langMap[ext]; ok {
@@ -853,17 +979,31 @@ func getRelativePath(fullPath string) string {
 }
 
 func getToolIcon(toolName string) string {
-	switch {
-	case strings.Contains(toolName, "WebSearch"), strings.Contains(toolName, "WebFetch"):
+	switch toolName {
+	case "WebSearch":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>`
+	case "WebFetch":
 		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`
-	case strings.Contains(toolName, "Read"), strings.Contains(toolName, "Glob"), strings.Contains(toolName, "Grep"):
-		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
-	case strings.Contains(toolName, "Write"), strings.Contains(toolName, "Edit"):
+	case "Read":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
+	case "Glob":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3"/></svg>`
+	case "Grep":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`
+	case "Write":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`
+	case "Edit":
 		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
-	case strings.Contains(toolName, "Bash"):
+	case "Bash":
 		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`
-	case strings.Contains(toolName, "Task"), strings.Contains(toolName, "Todo"):
-		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`
+	case "TodoWrite":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
+	case "Task":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/></svg>`
+	case "AskUserQuestion":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+	case "EnterPlanMode", "ExitPlanMode":
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`
 	default:
 		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`
 	}

@@ -209,7 +209,22 @@ func parseContentBlock(item any) ContentBlock {
 		}
 
 	case "tool_result":
-		content, _ := data["content"].(string)
+		var content string
+		switch c := data["content"].(type) {
+		case string:
+			content = c
+		case []any:
+			for _, item := range c {
+				if textObj, ok := item.(map[string]any); ok {
+					if text, ok := textObj["text"].(string); ok {
+						if content != "" {
+							content += "\n"
+						}
+						content += text
+					}
+				}
+			}
+		}
 		toolUseID, _ := data["tool_use_id"].(string)
 		isError, _ := data["is_error"].(bool)
 		return ContentBlock{

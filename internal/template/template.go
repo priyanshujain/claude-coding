@@ -423,6 +423,76 @@ strong { font-weight: 600; }
   color: #333;
   font-weight: 500;
 }
+.subagent-block {
+  background: #f8f8f8;
+  border: 1px solid #e8e8e8;
+  border-left: 3px solid #999;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 4px 0;
+}
+.subagent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.subagent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #666;
+  color: white;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.subagent-badge svg {
+  width: 12px;
+  height: 12px;
+  color: white;
+}
+.subagent-note {
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+}
+.subagent-type {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.subagent-block .collapsible {
+  margin: 0;
+}
+.todo-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fafafa;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.todo-status {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+}
+.todo-item.completed .todo-status { color: #22c55e; }
+.todo-item.in-progress .todo-status { color: #3b82f6; }
+.todo-item.pending .todo-status { color: #9ca3af; }
+.todo-item.completed .todo-content { color: #666; text-decoration: line-through; }
+.todo-item.in-progress .todo-content { color: #333; font-weight: 500; }
+.todo-item.pending .todo-content { color: #555; }
 </style>
 </head>
 <body>
