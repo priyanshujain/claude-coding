@@ -505,14 +505,11 @@ func renderWriteTool(toolName, input, icon string) string {
 	result.WriteString(`<div class="tool-pill" title="` + html.EscapeString(filePath) + `">` + icon + ` ` + html.EscapeString(displayPath) + `</div>`)
 
 	if content != "" {
-		lang := detectLanguageFromPath(filePath)
-		truncated := content
-		if len(truncated) > 3000 {
-			truncated = truncated[:3000] + "\n... (truncated)"
+		result.WriteString(`<div class="diff-block">`)
+		lines := strings.Split(content, "\n")
+		for _, line := range lines {
+			result.WriteString(`<div class="diff-line diff-added">+ ` + html.EscapeString(line) + `</div>`)
 		}
-		result.WriteString(`<div class="collapsible">`)
-		result.WriteString(`<div class="collapsible-header"><span class="chevron">▶</span> File Content</div>`)
-		result.WriteString(`<div class="collapsible-content"><pre><code class="language-` + lang + `">` + html.EscapeString(truncated) + `</code></pre></div>`)
 		result.WriteString(`</div>`)
 	}
 
@@ -643,13 +640,9 @@ func renderToolResult(block parser.ContentBlock) string {
 	if toolName == "Read" {
 		content = stripLineNumbers(content)
 		lang := getLanguageFromInput(block.ToolInput)
-		truncated := content
-		if len(truncated) > 2000 {
-			truncated = truncated[:2000] + "\n... (truncated)"
-		}
 		return `<div class="collapsible tool-result">
 <div class="collapsible-header"><span class="chevron">▶</span> Read Result</div>
-<div class="collapsible-content"><pre><code class="language-` + lang + `">` + html.EscapeString(truncated) + `</code></pre></div>
+<div class="collapsible-content"><pre><code class="language-` + lang + `">` + html.EscapeString(content) + `</code></pre></div>
 </div>`
 	}
 
@@ -677,11 +670,6 @@ func renderToolResult(block parser.ContentBlock) string {
 		return ""
 	}
 
-	truncated := content
-	if len(truncated) > 2000 {
-		truncated = truncated[:2000] + "\n... (truncated)"
-	}
-
 	headerText := "Result"
 	if toolName != "" {
 		headerText = toolName + " Result"
@@ -689,7 +677,7 @@ func renderToolResult(block parser.ContentBlock) string {
 
 	return `<div class="collapsible tool-result">
 <div class="collapsible-header"><span class="chevron">▶</span> ` + html.EscapeString(headerText) + `</div>
-<div class="collapsible-content"><pre>` + html.EscapeString(truncated) + `</pre></div>
+<div class="collapsible-content"><pre>` + html.EscapeString(content) + `</pre></div>
 </div>`
 }
 
@@ -760,14 +748,9 @@ func renderGrepResult(content string) string {
 		return result.String()
 	}
 
-	truncated := content
-	if len(truncated) > 2000 {
-		truncated = truncated[:2000] + "\n... (truncated)"
-	}
-
 	return `<div class="collapsible tool-result">
 <div class="collapsible-header"><span class="chevron">▶</span> Grep Result</div>
-<div class="collapsible-content"><pre>` + html.EscapeString(truncated) + `</pre></div>
+<div class="collapsible-content"><pre>` + html.EscapeString(content) + `</pre></div>
 </div>`
 }
 
@@ -776,14 +759,9 @@ func renderTaskResult(content string) string {
 		return ""
 	}
 
-	truncated := content
-	if len(truncated) > 3000 {
-		truncated = truncated[:3000] + "\n... (truncated)"
-	}
-
 	return `<div class="collapsible tool-result">
 <div class="collapsible-header"><span class="chevron">▶</span> Agent Result</div>
-<div class="collapsible-content"><div class="text-block">` + formatText(truncated) + `</div></div>
+<div class="collapsible-content"><div class="text-block">` + formatText(content) + `</div></div>
 </div>`
 }
 
@@ -859,13 +837,9 @@ func renderTaskTool(toolName, input, icon string) string {
 	result.WriteString(`<div class="subagent-type">` + html.EscapeString(pillText) + `</div>`)
 
 	if prompt != "" {
-		truncated := prompt
-		if len(truncated) > 500 {
-			truncated = truncated[:500] + "..."
-		}
 		result.WriteString(`<div class="collapsible">`)
 		result.WriteString(`<div class="collapsible-header"><span class="chevron">▶</span> Prompt</div>`)
-		result.WriteString(`<div class="collapsible-content"><pre>` + html.EscapeString(truncated) + `</pre></div>`)
+		result.WriteString(`<div class="collapsible-content"><pre>` + html.EscapeString(prompt) + `</pre></div>`)
 		result.WriteString(`</div>`)
 	}
 

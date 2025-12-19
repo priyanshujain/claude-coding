@@ -2,23 +2,15 @@
 
 A Claude Code plugin that exports conversation threads to shareable links via GitHub Gists.
 
+This is inspired by [ampcode.com](https://ampcode.com) threads.
+
 ## Features
 
 - Exports Claude Code sessions to self-contained HTML files
 - Creates shareable preview links via GitHub Gists
 - **Session Linking**: Navigate between related sessions with Previous/Next links
   - When you use `/clear` to start a new session, it automatically links to the previous session
-  - Exported gists include navigation to browse your session history
-- Clean, minimal UI inspired by [ampcode.com](https://ampcode.com) thread sharing
-- Proper markdown rendering (headers, bold, code blocks, lists, links)
-- Collapsible sections for thinking blocks and tool results
-- Smart tool display:
-  - **WebFetch/WebSearch**: Shows clickable URL + prompt
-  - **Read/Glob/Grep**: Shows file path
-  - **Bash**: Shows command description or truncated command
-  - **Edit**: Shows file diffs
-- Auto-extracts title from first user message or session summary
-- Detects system username and generates avatar initials
+  - Exported gists include navigation to browse your session history within a single claude code terminal session.
 
 ## Installation
 
@@ -41,6 +33,8 @@ claude
 # 4. Install the plugin
 /plugin install claude-coding@priyanshujain
 ```
+
+NOTE: Enable auto-updates for the plugin when adding marketplace and installing plugin to get the latest features and fixes.
 
 ## Usage
 
@@ -82,6 +76,4 @@ When you run `/share`:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture details, and coding guidelines.
 
-## License
 
-Apache 2.0
