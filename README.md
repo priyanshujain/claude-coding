@@ -4,6 +4,12 @@ A Claude Code plugin that exports conversation threads to shareable links via Gi
 
 This is inspired by [ampcode.com](https://ampcode.com) threads.
 
+
+
+https://github.com/user-attachments/assets/cf3db6b9-964a-4a31-8f13-3c1f32238f11
+
+
+
 ## Features
 
 - Exports Claude Code sessions to self-contained HTML files
