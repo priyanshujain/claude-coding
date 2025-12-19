@@ -11,9 +11,14 @@
       "name": "claude-coding",
       "source": "./",
       "description": "Claude Code plugins by Priyanshu Jain",
-      "version": "0.0.1",
+      "version": "0.0.3",
       "license": "MIT",
-      "keywords": ["share", "export", "html", "thread"]
+      "keywords": [
+        "share",
+        "export",
+        "html",
+        "thread"
+      ]
     }
   ]
 }

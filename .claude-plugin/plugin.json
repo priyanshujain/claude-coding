@@ -1,11 +1,15 @@
 {
   "name": "claude-coding",
   "description": "Share Claude Code threads as HTML",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "author": {
     "name": "Priyanshu Jain"
   },
   "repository": "https://github.com/priyanshujain/claude-coding",
   "license": "MIT",
-  "keywords": ["share", "export", "html"]
+  "keywords": [
+    "share",
+    "export",
+    "html"
+  ]
 }
