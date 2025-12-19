@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 )
 
@@ -48,69 +46,6 @@ type ContentBlock struct {
 	ToolUseID string
 	ToolInput string
 	IsError   bool
-}
-
-func FindSessionFile(projectPath string) (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	projectFolder := strings.ReplaceAll(projectPath, "/", "-")
-	projectFolder = strings.ReplaceAll(projectFolder, ".", "-")
-
-	claudeProjectDir := filepath.Join(homeDir, ".claude", "projects", projectFolder)
-
-	entries, err := os.ReadDir(claudeProjectDir)
-	if err != nil {
-		return "", err
-	}
-
-	var latestFile string
-	var latestTime time.Time
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".jsonl") || strings.HasPrefix(name, "agent-") {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		if info.ModTime().After(latestTime) {
-			latestTime = info.ModTime()
-			latestFile = filepath.Join(claudeProjectDir, name)
-		}
-	}
-
-	if latestFile == "" {
-		return "", os.ErrNotExist
-	}
-
-	return latestFile, nil
-}
-
-func FindSessionFileByID(projectPath, sessionID string) (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	projectFolder := strings.ReplaceAll(projectPath, "/", "-")
-	projectFolder = strings.ReplaceAll(projectFolder, ".", "-")
-
-	claudeProjectDir := filepath.Join(homeDir, ".claude", "projects", projectFolder)
-	sessionFile := filepath.Join(claudeProjectDir, sessionID+".jsonl")
-
-	if _, err := os.Stat(sessionFile); err != nil {
-		return "", err
-	}
-
-	return sessionFile, nil
 }
 
 var (

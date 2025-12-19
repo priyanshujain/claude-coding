@@ -75,31 +75,24 @@ func shareCmd(args []string) {
 		os.Exit(1)
 	}
 
-	var prevSessionID, nextSessionID string
-	if sessionID != "" {
-		m, _ := metadata.LoadMetadata(projectPath)
-		sessionID, _ = m.ResolveLatestSession(sessionID)
-		prevSessionID = m.GetPrevSessionID(sessionID)
-		nextSessionID = m.GetNextSessionID(sessionID)
+	sessionID, err = parser.ResolveCurrentSessionID(projectPath, sessionID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error finding session: %v\n", err)
+		os.Exit(1)
 	}
+
+	m, _ := metadata.LoadMetadata(projectPath)
+	prevSessionID := m.GetPrevSessionID(sessionID)
+	nextSessionID := m.GetNextSessionID(sessionID)
 
 	if outputPath == "" {
 		outputPath = fmt.Sprintf("./thread-%s.html", time.Now().Format("20060102-150405"))
 	}
 
-	var sessionFile string
-	if sessionID != "" {
-		sessionFile, err = parser.FindSessionFileByID(projectPath, sessionID)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error finding session %s: %v\n", sessionID, err)
-			os.Exit(1)
-		}
-	} else {
-		sessionFile, err = parser.FindSessionFile(projectPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error finding session: %v\n", err)
-			os.Exit(1)
-		}
+	sessionFile, err := parser.GetSessionFilePath(projectPath, sessionID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error finding session file: %v\n", err)
+		os.Exit(1)
 	}
 
 	messages, err := parser.ParseFile(sessionFile)
@@ -279,7 +272,7 @@ func ensureSessionGist(projectPath string, m *metadata.Metadata, sessionID strin
 		return
 	}
 
-	sessionFile, err := parser.FindSessionFileByID(projectPath, sessionID)
+	sessionFile, err := parser.GetSessionFilePath(projectPath, sessionID)
 	if err != nil {
 		return
 	}
@@ -322,7 +315,7 @@ func syncSessionGist(projectPath string, m *metadata.Metadata, sessionID, adjace
 		return
 	}
 
-	sessionFile, err := parser.FindSessionFileByID(projectPath, sessionID)
+	sessionFile, err := parser.GetSessionFilePath(projectPath, sessionID)
 	if err != nil {
 		return
 	}
