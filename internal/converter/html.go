@@ -283,6 +283,18 @@ func renderToolUse(content string) string {
 		return renderGlobTool(toolName, toolInput)
 	}
 
+	if strings.Contains(toolName, "Write") {
+		return renderWriteTool(toolName, toolInput, icon)
+	}
+
+	if toolName == "ExitPlanMode" {
+		return renderExitPlanModeTool(toolName, toolInput, icon)
+	}
+
+	if toolName == "AskUserQuestion" {
+		return renderAskUserQuestionTool(toolName, toolInput, icon)
+	}
+
 	return `<div class="tool-block">
 <div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div>
 </div>`
@@ -421,6 +433,141 @@ func renderGlobTool(toolName, input string) string {
 </div>`
 }
 
+func renderWriteTool(toolName, input, icon string) string {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(input), &data); err != nil {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	filePath, _ := data["file_path"].(string)
+	content, _ := data["content"].(string)
+
+	if filePath == "" {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	displayPath := getRelativePath(filePath)
+
+	var result strings.Builder
+	result.WriteString(`<div class="tool-block">`)
+	result.WriteString(`<div class="tool-pill" title="` + html.EscapeString(filePath) + `">` + icon + ` ` + html.EscapeString(displayPath) + `</div>`)
+
+	if content != "" {
+		lang := detectLanguageFromPath(filePath)
+		truncated := content
+		if len(truncated) > 3000 {
+			truncated = truncated[:3000] + "\n... (truncated)"
+		}
+		result.WriteString(`<div class="collapsible">`)
+		result.WriteString(`<div class="collapsible-header"><span class="chevron">▶</span> File Content</div>`)
+		result.WriteString(`<div class="collapsible-content"><pre><code class="language-` + lang + `">` + html.EscapeString(truncated) + `</code></pre></div>`)
+		result.WriteString(`</div>`)
+	}
+
+	result.WriteString(`</div>`)
+	return result.String()
+}
+
+func renderExitPlanModeTool(toolName, input, icon string) string {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(input), &data); err != nil {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	plan, _ := data["plan"].(string)
+
+	var result strings.Builder
+	result.WriteString(`<div class="tool-block">`)
+	result.WriteString(`<div class="tool-pill">` + icon + ` ExitPlanMode</div>`)
+
+	if plan != "" {
+		result.WriteString(`<div class="collapsible">`)
+		result.WriteString(`<div class="collapsible-header"><span class="chevron">▶</span> Plan</div>`)
+		result.WriteString(`<div class="collapsible-content"><div class="text-block">` + formatText(plan) + `</div></div>`)
+		result.WriteString(`</div>`)
+	}
+
+	result.WriteString(`</div>`)
+	return result.String()
+}
+
+func renderAskUserQuestionTool(toolName, input, icon string) string {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(input), &data); err != nil {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	questions, ok := data["questions"].([]any)
+	if !ok || len(questions) == 0 {
+		return `<div class="tool-block"><div class="tool-pill">` + icon + ` ` + html.EscapeString(toolName) + `</div></div>`
+	}
+
+	var result strings.Builder
+	result.WriteString(`<div class="tool-block question-block">`)
+	result.WriteString(`<div class="tool-pill">` + icon + ` AskUserQuestion</div>`)
+
+	for _, q := range questions {
+		qMap, ok := q.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		question, _ := qMap["question"].(string)
+		header, _ := qMap["header"].(string)
+		options, _ := qMap["options"].([]any)
+
+		result.WriteString(`<div class="question-item">`)
+		if header != "" {
+			result.WriteString(`<div class="question-header">` + html.EscapeString(header) + `</div>`)
+		}
+		if question != "" {
+			result.WriteString(`<div class="question-text">` + html.EscapeString(question) + `</div>`)
+		}
+		if len(options) > 0 {
+			result.WriteString(`<div class="question-options">`)
+			for _, opt := range options {
+				optMap, ok := opt.(map[string]any)
+				if !ok {
+					continue
+				}
+				label, _ := optMap["label"].(string)
+				desc, _ := optMap["description"].(string)
+				result.WriteString(`<div class="question-option">`)
+				result.WriteString(`<span class="option-label">` + html.EscapeString(label) + `</span>`)
+				if desc != "" {
+					result.WriteString(`<span class="option-desc">` + html.EscapeString(desc) + `</span>`)
+				}
+				result.WriteString(`</div>`)
+			}
+			result.WriteString(`</div>`)
+		}
+		result.WriteString(`</div>`)
+	}
+
+	result.WriteString(`</div>`)
+	return result.String()
+}
+
+func detectLanguageFromPath(filePath string) string {
+	ext := strings.ToLower(filePath)
+	if idx := strings.LastIndex(ext, "."); idx >= 0 {
+		ext = ext[idx:]
+	}
+
+	langMap := map[string]string{
+		".go": "go", ".py": "python", ".js": "javascript", ".ts": "typescript",
+		".tsx": "typescript", ".jsx": "javascript", ".json": "json", ".yaml": "yaml",
+		".yml": "yaml", ".md": "markdown", ".sh": "bash", ".bash": "bash",
+		".rs": "rust", ".html": "markup", ".xml": "markup", ".css": "css",
+		".sql": "sql", ".rb": "ruby", ".java": "java", ".c": "c", ".cpp": "cpp",
+	}
+
+	if lang, ok := langMap[ext]; ok {
+		return lang
+	}
+	return "plaintext"
+}
+
 func renderToolResult(block parser.ContentBlock) string {
 	toolName := block.ToolName
 	content := block.Content
@@ -452,6 +599,18 @@ func renderToolResult(block parser.ContentBlock) string {
 <div class="collapsible-header"><span class="chevron">▶</span> Read Result</div>
 <div class="collapsible-content"><pre><code class="language-` + lang + `">` + html.EscapeString(truncated) + `</code></pre></div>
 </div>`
+	}
+
+	if toolName == "Write" {
+		return ""
+	}
+
+	if toolName == "ExitPlanMode" {
+		return `<div class="tool-result-inline plan-approved">✓ User approved the plan</div>`
+	}
+
+	if toolName == "AskUserQuestion" {
+		return renderAskUserQuestionResult(content)
 	}
 
 	truncated := content
@@ -546,6 +705,41 @@ func renderGrepResult(content string) string {
 <div class="collapsible-header"><span class="chevron">▶</span> Grep Result</div>
 <div class="collapsible-content"><pre>` + html.EscapeString(truncated) + `</pre></div>
 </div>`
+}
+
+func renderAskUserQuestionResult(content string) string {
+	if !strings.Contains(content, "User has answered") {
+		return `<div class="tool-result-inline">` + html.EscapeString(content) + `</div>`
+	}
+
+	var result strings.Builder
+	result.WriteString(`<div class="question-result">`)
+	result.WriteString(`<div class="question-result-header">User's answers:</div>`)
+
+	answerPart := content
+	if idx := strings.Index(content, ":"); idx >= 0 {
+		answerPart = content[idx+1:]
+	}
+	if idx := strings.Index(answerPart, ". You can now"); idx >= 0 {
+		answerPart = answerPart[:idx]
+	}
+
+	pairs := strings.Split(answerPart, "\", \"")
+	for _, pair := range pairs {
+		pair = strings.Trim(pair, " \"")
+		if eqIdx := strings.Index(pair, "\"=\""); eqIdx >= 0 {
+			q := pair[:eqIdx]
+			a := pair[eqIdx+3:]
+			a = strings.TrimSuffix(a, "\"")
+			result.WriteString(`<div class="answer-item">`)
+			result.WriteString(`<span class="answer-question">` + html.EscapeString(q) + `</span>`)
+			result.WriteString(`<span class="answer-value">` + html.EscapeString(a) + `</span>`)
+			result.WriteString(`</div>`)
+		}
+	}
+
+	result.WriteString(`</div>`)
+	return result.String()
 }
 
 func stripLineNumbers(content string) string {
