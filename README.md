@@ -2,6 +2,11 @@
 
 A Claude Code plugin that exports conversation threads to shareable links via GitHub Gists.
 
+This project is moved to http://github.com/73ai/workbench
+
+---
+
+
 This is inspired by [ampcode.com](https://ampcode.com) threads.
 
 
